@@ -154,7 +154,7 @@ mask = (
     & (ds.lat > extent[2])
     & (ds.lat < extent[3])
 )
-pr = ds.pr
+pr = ds.pr.where(mask, drop = True)
 
 # %% create a plot
 
