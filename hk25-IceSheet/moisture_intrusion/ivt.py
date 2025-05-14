@@ -1,4 +1,5 @@
 # %% load packages
+from calendar import c
 import numpy as np
 import intake
 import pandas as pd
@@ -9,6 +10,7 @@ import matplotlib.path as mpath
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import warnings
+
 
 warnings.filterwarnings(
     "ignore", category=FutureWarning
@@ -79,10 +81,10 @@ current_location = "online"
 cat = intake.open_catalog(
     "https://digital-earths-global-hackathon.github.io/catalog/catalog.yaml"
 )[current_location]
-pd.DataFrame(cat["icon_ngc4008"].describe()["user_parameters"])
+pd.DataFrame(cat["icon_d3hp003"].describe()["user_parameters"])
 
 # %% load data
-ds = cat["icon_d3hp003"](zoom=7, time="P1D").to_dask()
+ds = cat["icon_d3hp003"](zoom=5, time="P1D").to_dask()
 ds = egh.attach_coords(ds)
 
 # egh.healpix_show(ds["ts"].sel(time="2020-05-10T00:00:00"), cmap="inferno", dpi=72);
@@ -97,11 +99,16 @@ mask = (
     & (ds.lat < extent[3])
 )
 
-masked_ds = ds.isel(time =10).where(mask, drop=True)
+gris_cells = ds.sftgif.where(mask & (ds.sftgif > 0.5), drop = True).cell
 
-# %%
+masked_ds = ds[['hus', 'ua', 'va', 'pr']].where(mask, drop=True)
+
+
+# %% define the ivt function
 
 def calc_ivt(ds):
+    g = 9.81  # m/s^2
+
     """
     Calculate the integrated vapor transport (IVT) from the ICON data.
     """
@@ -116,8 +123,8 @@ def calc_ivt(ds):
     mertrans = v * q
 
     # compute the IVT
-    izontrans = zontrans.integrate('pressure')
-    imertrans = mertrans.integrate('pressure')
+    izontrans = zontrans.integrate('pressure')/g
+    imertrans = mertrans.integrate('pressure')/g
 
     ivt = np.sqrt(izontrans**2 + imertrans**2)
 
@@ -127,53 +134,46 @@ def calc_ivt(ds):
 # %%
 
 ivt = calc_ivt(masked_ds)
+
+#%% find days with IVT > 100 kg m-1 s-1
+
+gris_max_pr = masked_ds.sel(cell = gris_cells).pr.max(dim="cell").compute() * 24 * 360
+hp_idx = np.argwhere(gris_max_pr.values >3)
+
+ardays = (ivt.sel(cell = gris_cells) > 100).any(dim="cell").compute()
+
+max_ivt = ivt.sel(cell = gris_cells).max(dim="cell").compute()
+
+
+
+# %% plot as stereographic
+
+for i in range(249,255):
+    fig, ax = stereogr_ax(extent, dpi=72)
+    ax.set_extent(extent, crs=ccrs.PlateCarree())
+    p = egh.healpix_show(ivt.isel(time = i), ax = ax, vmin = 0, vmax = 250)
+    cbar = plt.colorbar(p, orientation="horizontal", pad=0.05)
+    cbar.set_label("IVT (kg m$^{-1}$ s$^{-1}$)", fontsize=12)
+    ax.annotate('day ' + str(i), xy=(0.5, 0.95), xycoords='axes fraction', annotation_clip=False)
+
+
+# %%  load higher resolution
+
+ds10 = cat["icon_d3hp003"](zoom=10, time="PT6H", time_method = 'inst').to_dask()
+ds10 = egh.attach_coords(ds10)
+ds_high = ds10[['hus', 'ua', 'va', 'pr']].sel(time = slice('2020-09-10', '2020-09-15')).where(mask, drop=True)
+
+ivt10 = calc_ivt(ds_high)
+
+# %% plot as stereographic
+
+for i in range(24):
+    fig, ax = stereogr_ax(extent, dpi=72)
+    ax.set_extent(extent, crs=ccrs.PlateCarree())
+    p = egh.healpix_show(ivt10.isel(time = i), ax = ax, vmin = 0, vmax = 250)
+    cbar = plt.colorbar(p, orientation="horizontal", pad=0.05)
+    cbar.set_label("IVT (kg m$^{-1}$ s$^{-1}$)", fontsize=12)
+    ax.annotate('day ' + str(i), xy=(0.5, 0.95), xycoords='axes fraction', annotation_clip=False)
+
+
 # %%
-
-fig, ax = stereogr_ax(extent, dpi=600)
-ax.set_extent(extent, crs=ccrs.PlateCarree())
-# egh.healpix_show(ivt, ax = ax)
-
-_, _, nx, ny = np.array(ax.bbox.bounds, dtype=int) * 2
-xlims = ax.get_xlim()
-ylims = ax.get_ylim()
-
-data = egh.healpix_resample(
-    ivt, xlims, ylims, nx, ny, ax.projection
-)
-
-ax.imshow(data, extent = xlims + ylims, origin = 'lower')
-
-# %%
-fig, ax = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()}, dpi=300)
-ax.add_feature(cfeature.COASTLINE)
-ax.set_extent(extent, crs=ccrs.PlateCarree())
-
-_, _, nx, ny = np.array(ax.bbox.bounds, dtype=int) * 2
-xlims = ax.get_xlim()
-ylims = ax.get_ylim()
-
-test = egh.healpix_resample(
-    ivt, xlims, ylims, nx, ny, ax.projection
-)
-
-egh.healpix_show(ivt, dpi=300, ax = ax)
-# ax.contourf(data.x, data.y, data)
-
-
-
-
-# %%
-fig, ax = stereogr_ax(extent, dpi=300)
-ax.set_extent(extent, crs=ccrs.PlateCarree())
-# ax.add_feature(cfeature.LAND)
-# ax.add_feature(cfeature.OCEAN)
-
-_, _, nx, ny = np.array(ax.bbox.bounds, dtype=int) * 2
-xlims = ax.get_xlim()
-ylims = ax.get_ylim()
-
-data = egh.healpix_resample(
-    pr.sel(time="2025-01-01"), xlims, ylims, nx, ny, ax.projection
-)
-
-ax.contourf(data.x, data.y, data)
