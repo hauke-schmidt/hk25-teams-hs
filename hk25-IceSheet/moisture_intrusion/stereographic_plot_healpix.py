@@ -159,16 +159,19 @@ pr = ds.pr
 # %% create a plot
 
 fig, ax = stereogr_ax(extent, dpi=300)
+ax.add_feature(cfeature.COASTLINE)
 ax.set_extent(extent, crs=ccrs.PlateCarree())
+egh.healpix_show(pr.sel(time="2025-01-01"), ax=ax)
 # ax.add_feature(cfeature.LAND)
 # ax.add_feature(cfeature.OCEAN)
 
-_, _, nx, ny = np.array(ax.bbox.bounds, dtype=int) * 2
-xlims = ax.get_xlim()
-ylims = ax.get_ylim()
+# _, _, nx, ny = np.array(ax.bbox.bounds, dtype=int) * 2
+# xlims = ax.get_xlim()
+# ylims = ax.get_ylim()
 
-data = egh.healpix_resample(
-    pr.sel(time="2025-01-01"), xlims, ylims, nx, ny, ax.projection
-)
+# data = egh.healpix_resample(
+#     pr.sel(time="2025-01-01"), xlims, ylims, nx, ny, ax.projection
+# )
 
-ax.contourf(data.x, data.y, data)
+# this is not correct, not sure why.
+# ax.contourf(data.x, data.y, data)
