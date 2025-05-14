@@ -17,7 +17,7 @@ warnings.filterwarnings(
 )  # don't warn us about future package conflicts
 
 
-# %% define stereographic plot
+# %% define stereographic plot 
 
 
 def make_boundary_path(minlon, maxlon, minlat, maxlat, n=50):
@@ -47,8 +47,7 @@ def make_boundary_path(minlon, maxlon, minlat, maxlat, n=50):
 
     return boundary_path
 
-
-def stereogr_ax(extent, set_boundary=True, shape=None, grid=True, **kwargs):
+def stereogr_ax(extent, set_boundary=True, shape=None, grid = True, **kwargs):
     midlon = (extent[0] + extent[1]) / 2
     midlat = (extent[2] + extent[3]) / 2
 
@@ -58,7 +57,9 @@ def stereogr_ax(extent, set_boundary=True, shape=None, grid=True, **kwargs):
         shape = (1, 1)  # Default to a single subplot if shape is not provided
 
     fig, axes = plt.subplots(
-        *shape, subplot_kw={"projection": projection}, dpi=kwargs.get("dpi", 300)
+        *shape,
+        subplot_kw={"projection": projection},
+        dpi=kwargs.get("dpi", 300)
     )
 
     # Ensure axes is always a 2D array for consistency
@@ -71,7 +72,7 @@ def stereogr_ax(extent, set_boundary=True, shape=None, grid=True, **kwargs):
 
     for ax in axes.flat:
         ax.set_extent(extent, crs=ccrs.PlateCarree())
-        ax.add_feature(cfeature.COASTLINE, lw=0.5)
+        ax.add_feature(cfeature.COASTLINE, lw = 0.5)
 
         if set_boundary:
             ax.set_boundary(boundary, transform=ccrs.PlateCarree())
@@ -85,7 +86,7 @@ def stereogr_ax(extent, set_boundary=True, shape=None, grid=True, **kwargs):
     return fig, axes
 
 
-# %% old stereographic plot function
+#%% old stereographic plot function
 # def stereogr_ax(extent, set_boundary=True, shape = None, **kwargs):
 
 #     midlon = (extent[0] + extent[1]) / 2
@@ -120,18 +121,17 @@ current_location = "online"
 cat = intake.open_catalog(
     "https://digital-earths-global-hackathon.github.io/catalog/catalog.yaml"
 )[current_location]
-pd.DataFrame(cat["icon_d3hp003"].describe()["user_parameters"])
-
-extent = [280, 350, 58, 85]
+pd.DataFrame(cat["ERA5"].describe()["user_parameters"])
 
 # %% load data
-ds = cat["icon_d3hp003"](zoom=5, time="P1D").to_dask()
+ds = cat["ERA5"](zoom=8).to_dask()
 ds = egh.attach_coords(ds)
 
 # egh.healpix_show(ds["ts"].sel(time="2020-05-10T00:00:00"), cmap="inferno", dpi=72);
 
 # %%
 
+extent = [280, 350, 58, 85]
 mask = (
     (ds.lon > extent[0])
     & (ds.lon < extent[1])
@@ -139,14 +139,12 @@ mask = (
     & (ds.lat < extent[3])
 )
 
-# %%
-gris_cells = ds.sftgif.where(mask & (ds.sftgif > 0.5), drop=True).cell
+gris_cells = ds.sftgif.where(mask & (ds.sftgif > 0.5), drop = True).cell
 
-masked_ds = ds[["hus", "ua", "va", "pr"]].where(mask, drop=True)
+masked_ds = ds[['hus', 'ua', 'va', 'pr']].where(mask, drop=True)
 
 
 # %% define the ivt function
-
 
 def calc_ivt(ds):
     g = 9.81  # m/s^2
@@ -155,7 +153,7 @@ def calc_ivt(ds):
     Calculate the integrated vapor transport (IVT) from the ICON data.
     """
     # get the specific humidity
-    q = ds.hus
+    q = ds.hus 
 
     # get the wind speed
     u = ds.ua
@@ -165,8 +163,8 @@ def calc_ivt(ds):
     mertrans = v * q
 
     # compute the IVT
-    izontrans = zontrans.integrate("pressure") / g
-    imertrans = mertrans.integrate("pressure") / g
+    izontrans = zontrans.integrate('pressure')/g
+    imertrans = mertrans.integrate('pressure')/g
 
     ivt = np.sqrt(izontrans**2 + imertrans**2)
 
@@ -177,35 +175,35 @@ def calc_ivt(ds):
 
 ivt = calc_ivt(masked_ds)
 
-# %% find days with IVT > 100 kg m-1 s-1
+#%% find days with IVT > 100 kg m-1 s-1
 
-gris_max_pr = masked_ds.sel(cell=gris_cells).pr.max(dim="cell").compute() * 24 * 360
-gris_mean_pr = masked_ds.sel(cell=gris_cells).pr.mean(dim="cell").compute() * 24 * 360
+gris_max_pr = masked_ds.sel(cell = gris_cells).pr.max(dim="cell").compute() * 24 * 360
+gris_mean_pr = masked_ds.sel(cell = gris_cells).pr.mean(dim="cell").compute() * 24 * 360
 
-hp_idx = np.argwhere(gris_max_pr.values > 3)
+hp_idx = np.argwhere(gris_max_pr.values >3)
 
-ardays = (ivt.sel(cell=gris_cells) > 100).any(dim="cell").compute()
+ardays = (ivt.sel(cell = gris_cells) > 100).any(dim="cell").compute()
 
-max_ivt = ivt.sel(cell=gris_cells).max(dim="cell").compute()
+max_ivt = ivt.sel(cell = gris_cells).max(dim="cell").compute()
+
 
 
 # %% plot as stereographic
 
-for i in range(249, 255):
+for i in range(249,255):
     fig, ax = stereogr_ax(extent, dpi=72)
     ax.set_extent(extent, crs=ccrs.PlateCarree())
-    p = egh.healpix_show(ivt.isel(time=i), ax=ax, vmin=0, vmax=250)
+    p = egh.healpix_show(ivt.isel(time = i), ax = ax, vmin = 0, vmax = 250)
     cbar = plt.colorbar(p, orientation="horizontal", pad=0.05)
     cbar.set_label("IVT (kg m$^{-1}$ s$^{-1}$)", fontsize=12)
-    ax.annotate(
-        "day " + str(i), xy=(0.5, 0.95), xycoords="axes fraction", annotation_clip=False
-    )
+    ax.annotate('day ' + str(i), xy=(0.5, 0.95), xycoords='axes fraction', annotation_clip=False)
 
 
 # %%  load higher resolution
 
 
-ds10 = cat["icon_d3hp003"](zoom=10, time="PT6H", time_method="inst").to_dask()
+
+ds10 = cat["icon_d3hp003"](zoom=10, time="PT6H", time_method = 'inst').to_dask()
 ds10 = egh.attach_coords(ds10)
 
 mask10 = (
@@ -215,79 +213,41 @@ mask10 = (
     & (ds10.lat < extent[3])
 )
 
-ds_high = (
-    ds10[["hus", "ua", "va", "pr"]]
-    .sel(time=slice("2020-09-10", "2020-09-15"))
-    .where(mask10, drop=True)
-)
+ds_high = ds10[['hus', 'ua', 'va', 'pr']].sel(time = slice('2020-09-10', '2020-09-15')).where(mask10, drop=True)
 
 ivt10 = calc_ivt(ds_high)
 
 # %% plot as stereographic
 
-fig, ax = stereogr_ax(extent, shape=(4, 4), dpi=300, grid=False)
+fig, ax = stereogr_ax(extent, shape = (4,4), dpi=300, grid = False)
 
 for i in range(16):
-    # fig, ax = stereogr_ax(extent, dpi=72)
+    #fig, ax = stereogr_ax(extent, dpi=72)
     # ax[i].set_extent(extent, crs=ccrs.PlateCarree())
-    p = egh.healpix_show(ivt10.isel(time=i), ax=ax.flatten()[i], vmin=0, vmax=1000)
+    p = egh.healpix_show(ivt10.isel(time = i), ax = ax.flatten()[i], vmin = 0, vmax = 1000)
     ax.flatten()[i].set_title(ivt10.time[i].values.astype(str)[:16], fontsize=4)
     # cbar = plt.colorbar(p, orientation="horizontal", pad=0.05)
 
     # cbar.ax.tick_params(labelsize=4)
     # #ax.annotate('day ' + str(i), xy=(0.5, 0.95), xycoords='axes fraction', annotation_clip=False)
-cbar = fig.colorbar(p, ax=ax, orientation="vertical", pad=0.05, aspect=40)
+cbar = fig.colorbar(p, ax=ax, orientation='vertical', pad=0.05, aspect=40)
 cbar.set_label("IVT (kg m$^{-1}$ s$^{-1}$)")
-plt.savefig("ivt.png", dpi=300, bbox_inches="tight")
 
 
 # %%
 
-fig, ax = stereogr_ax(extent, shape=(4, 4), dpi=300, grid=False)
+fig, ax = stereogr_ax(extent, shape = (4,4), dpi=300, grid = False)
 
-spd = 24 * 360
+spd = 24 *  360
 for i in range(16):
 
-    p = egh.healpix_show(
-        ds_high.pr.isel(time=i) * spd, ax=ax.flatten()[i], vmin=0, vmax=10, cmap=cm.rain
-    )
+    p = egh.healpix_show(ds_high.pr.isel(time = i) * spd, ax = ax.flatten()[i], vmin = 0, vmax = 10, cmap = cm.rain)
     # cbar = plt.colorbar(p, orientation="horizontal", pad=0.05)
     # cbar.set_label("precip (kg m$^{-2}$ s$^{-1}$)", fontsize=4)
     ax.flatten()[i].set_title(ds_high.time[i].values.astype(str)[:16], fontsize=4)
-cbar = fig.colorbar(p, ax=ax, orientation="vertical", pad=0.05, aspect=40)
+cbar = fig.colorbar(p, ax=ax, orientation='vertical', pad=0.05, aspect=40)
 cbar.set_label("inst. precip. (mm / day)")
-plt.savefig("precip.png", dpi=300, bbox_inches="tight")
 
-
-# %%
-
-dsP1D10 = cat["icon_d3hp003"](zoom=10, time="P1D").to_dask()
-dsP1D10 = egh.attach_coords(dsP1D10)
-mask10 = (
-    (dsP1D10.lon > extent[0])
-    & (dsP1D10.lon < extent[1])
-    & (dsP1D10.lat > extent[2])
-    & (dsP1D10.lat < extent[3])
-)
-
-dsP1D10 = dsP1D10.pr.where(mask10, drop=True).sel(
-    time=slice("2020-09-10", "2020-09-15")
-)
-
-# %%
-fig, ax = stereogr_ax(extent, shape=(1, 3), dpi=300, grid=False)
-spd = 24 * 360
-
-for i in range(1, 4):
-
-    p = egh.healpix_show(
-        dsP1D10.isel(time=i) * spd, ax=ax.flatten()[i-1], vmin=0, vmax=10, cmap=cm.rain
-    )
-    # cbar = plt.colorbar(p, orientation="horizontal", pad=0.05)
-    # cbar.set_label("precip (kg m$^{-2}$ s$^{-1}$)", fontsize=4)
-    ax.flatten()[i-1].set_title(dsP1D10.time[i].values.astype(str)[:12], fontsize=4)
-cbar = fig.colorbar(p, ax=ax, orientation="horizontal", pad=0.05, aspect=40)
-cbar.set_label("daily mean precip. (mm / day)")
-plt.savefig("precip.png", dpi=300, bbox_inches="tight")
+    
 
 # %%
