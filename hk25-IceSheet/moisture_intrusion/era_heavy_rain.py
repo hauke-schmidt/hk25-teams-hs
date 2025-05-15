@@ -1,4 +1,6 @@
 # %% load packages
+import os 
+from glob import glob
 from calendar import c
 import numpy as np
 import intake
@@ -11,6 +13,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import warnings
 from cmocean import cm
+import cfgrib
 
 warnings.filterwarnings(
     "ignore", category=FutureWarning
@@ -19,6 +22,30 @@ warnings.filterwarnings(
 # %% define mask for relevant region
 
 extent = [280, 350, 58, 85]
+
+#%%
+# #-------------------
+# # LOAD ERA5 SST DATA
+# #-------------------
+
+# # Directory containing the GRIB files
+datadir = '/pool/data/ERA5/E5/sf/an/1H/034'
+
+filelist = np.sort(glob(datadir + '/*.grb').filter(lambda x: '2020' in x))
+
+
+# # List to store datasets
+datasets = []
+
+# Iterate over all GRIB files in the directory
+for filename in sorted(os.listdir(directory)):
+    if filename.endswith('.grb'):
+        filepath = os.path.join(directory, filename)
+        ds = cfgrib.open_dataset(filepath)
+        datasets.append(ds)
+
+# Concatenate all datasets along the 'time' dimension
+combined_ds = xr.concat(datasets, dim='time')
 
 # %% load icon data
 
